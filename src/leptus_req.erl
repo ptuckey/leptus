@@ -215,10 +215,12 @@ invoke(Pid, F, A) ->
     gen_server:call(Pid, {F, A}).
 
 -spec call_cowboy_req(atom(), [any()], cowboy_req:req()) -> any().
-call_cowboy_req(reply, Args, Req) ->
-    call_cowboy_req(reply, Args ++ [Req]);
+call_cowboy_req(F, Args, Req) when F == reply; F == chunked_reply ->
+    call_cowboy_req(F, Args ++ [Req]);
 call_cowboy_req(F, [], Req) ->
     call_cowboy_req(F, [Req]);
+call_cowboy_req(F, A, Req) when F == body; F == part ->
+    call_cowboy_req(F, [Req | A]);
 call_cowboy_req(F, [H|T], Req) ->
     A = [H] ++ [Req|T],
     call_cowboy_req(F, A).
