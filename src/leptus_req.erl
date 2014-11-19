@@ -133,11 +133,19 @@ body(Pid) ->
 
 -spec body_raw(pid()) -> binary().
 body_raw(Pid) ->
-    invoke(Pid, body, [infinity]).
+    body_raw_full(Pid, <<>>).
+
+body_raw_full(Pid, Acc) ->
+    case invoke(Pid, body, []) of
+        {more, Bin} ->
+            body_raw_full(Pid, << Acc/binary, Bin/binary >>);
+        Bin ->
+            << Acc/binary, Bin/binary >>
+    end.
 
 -spec body_qs(pid()) -> [{binary(), binary() | true}].
 body_qs(Pid) ->
-    invoke(Pid, body_qs, [infinity]).
+    invoke(Pid, body_qs, []).
 
 -spec header(pid(), binary()) -> binary() | undefined.
 header(Pid, Name) ->
@@ -215,10 +223,12 @@ invoke(Pid, F, A) ->
     gen_server:call(Pid, {F, A}).
 
 -spec call_cowboy_req(atom(), [any()], cowboy_req:req()) -> any().
-call_cowboy_req(reply, Args, Req) ->
-    call_cowboy_req(reply, Args ++ [Req]);
+call_cowboy_req(F, Args, Req) when F == reply; F == chunked_reply ->
+    call_cowboy_req(F, Args ++ [Req]);
 call_cowboy_req(F, [], Req) ->
     call_cowboy_req(F, [Req]);
+call_cowboy_req(F, A, Req) when F == body; F == part ->
+    call_cowboy_req(F, [Req | A]);
 call_cowboy_req(F, [H|T], Req) ->
     A = [H] ++ [Req|T],
     call_cowboy_req(F, A).
@@ -234,5 +244,7 @@ get_vr(Res={_, _}) ->
     Res;
 get_vr({ok, Value, Req}) ->
     {Value, Req};
+get_vr({more, Value, Req}) ->
+    {{more, Value}, Req};
 get_vr({undefined, Value, Req}) ->
     {Value, Req}.
