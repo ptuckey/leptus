@@ -133,11 +133,19 @@ body(Pid) ->
 
 -spec body_raw(pid()) -> binary().
 body_raw(Pid) ->
-    invoke(Pid, body, [infinity]).
+    body_raw_full(Pid, <<>>).
+
+body_raw_full(Pid, Acc) ->
+    case invoke(Pid, body, []) of
+        {more, Bin} ->
+            body_raw_full(Pid, << Acc/binary, Bin/binary >>);
+        Bin ->
+            << Acc/binary, Bin/binary >>
+    end.
 
 -spec body_qs(pid()) -> [{binary(), binary() | true}].
 body_qs(Pid) ->
-    invoke(Pid, body_qs, [infinity]).
+    invoke(Pid, body_qs, []).
 
 -spec header(pid(), binary()) -> binary() | undefined.
 header(Pid, Name) ->
@@ -236,5 +244,7 @@ get_vr(Res={_, _}) ->
     Res;
 get_vr({ok, Value, Req}) ->
     {Value, Req};
+get_vr({more, Value, Req}) ->
+    {{more, Value}, Req};
 get_vr({undefined, Value, Req}) ->
     {Value, Req}.
